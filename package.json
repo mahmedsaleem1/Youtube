@@ -1,0 +1,15 @@
+{
+  "name": "youtube",
+  "version": "1.0.0",
+  "description": "Learning Node JS by making Youtube Backend",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Backend",
+    "Youtube"
+  ],
+  "author": "Ahmed Saleem",
+  "license": "ISC"
+}
