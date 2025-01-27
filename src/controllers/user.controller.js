@@ -1,9 +1,8 @@
-import {asyncHandler} from "../utils/asyncHandler.js"
+import { asyncHandler } from "../utils/asyncHandler.js"
 import { User } from "../models/user.model.js"
 import { ApiError } from "../utils/apiError.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
-
 
 const registerUser = asyncHandler ( async (req, res) => {
     const {username, email, fullname, password} = req.body
@@ -12,7 +11,7 @@ const registerUser = asyncHandler ( async (req, res) => {
         throw new ApiError(400, "All Fields are Required")
     }
 
-    const existedUser = User.findOne({
+    const existedUser = await User.findOne({
         $or : [{ username } , { email }]
     })
 
@@ -25,14 +24,18 @@ const registerUser = asyncHandler ( async (req, res) => {
         throw new ApiError(409, "Avatar is Required")
     }
 
-    const coverImageLocalPath = req.files?.coverImage[0].path
-
     const avatarUrl = await uploadOnCloudinary(avatarLocalPath)
     if (!avatarUrl) {
         throw new ApiError(501, "Avatar Upload Failed please Try again")
     }
-
-    const coverImageUrl = await uploadOnCloudinary(coverImageLocalPath)
+    
+    let coverImageUrl = "";
+    
+    if ("coverImage" in req.files) {
+        const coverImageLocalPath = req.files.coverImage[0].path
+        coverImageUrl = await uploadOnCloudinary(coverImageLocalPath)
+        coverImageUrl = coverImageUrl.url
+    }
 
     const createdUser = await User.create({
         username : username.toLowerCase(),
@@ -40,10 +43,10 @@ const registerUser = asyncHandler ( async (req, res) => {
         fullname,
         password,
         avatar : avatarUrl.url,
-        coverImage : coverImage?.url || ""
+        coverImage : coverImageUrl
     })
-
-    const userExists = await createdUser.findById(createdUser._id).select("-password -refreshToken")
+    
+    const userExists = await User.findById(createdUser._id).select("-password -refreshToken")
 
     if (!userExists) {
         throw new ApiError(500, "User cannot be registered at this time")
