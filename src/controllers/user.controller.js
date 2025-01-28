@@ -4,6 +4,23 @@ import { ApiError } from "../utils/apiError.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 
+ const generateAccessAndRefreshToken = async (userId) => {
+    try {
+        const userToBeAuthorized = await User.findById (userId)
+    
+        const genAccessToken = await userToBeAuthorized.GenerateAccessToken()
+        const genRefreshToken = await userToBeAuthorized.GenerateRefreshToken()
+    
+        userToBeAuthorized.refreshToken = genAccessToken
+        await userToBeAuthorized.save({ validateBeforeSave : false })
+
+        return {genAccessToken, genRefreshToken}
+
+    } catch (error) {
+        throw new ApiError(500, "Unable to generate Tokens at the moment")
+    }
+ }
+
 const registerUser = asyncHandler ( async (req, res) => {
     const {username, email, fullname, password} = req.body
 
@@ -57,6 +74,49 @@ const registerUser = asyncHandler ( async (req, res) => {
     )
 })
 
+const loginUser = asyncHandler( async (req, res) => {
+    const {username, email, password} = req.body
+    
+    if (!username || !email) {
+        throw new ApiError(401, "Email and Username is required")
+    }
 
+    const userToBeLoggedIn = await User.findOne({
+        $or : {username, email}
+    })
 
-export {registerUser}
+    if (!userToBeLoggedIn) {
+        throw new ApiError(404, "User doesnot Exists")
+    }
+
+    const isPassValid = await userToBeLoggedIn.isPasswordCorrect(password)
+
+    if (!isPassValid) {
+        throw new ApiError(402, "Password is Incorrect")
+    }
+
+    const {genAccessToken, genRefreshToken} = await generateAccessAndRefreshToken(userToBeLoggedIn._id)
+
+    const loggedInUser = User.findById(userId._id).select("-password -refreshToken") // Dont wanna send pass and refToken
+
+    const options = { // Cookie Not modifiable from frontend but from server only
+        httpOnly : true,
+        secure : true
+    }
+
+    return res
+            .status(200)
+            .cookie("accessToken", genAccessToken, options)
+            .cookie("refreshToken", genRefreshToken, options)
+            .json(
+                new ApiResponse(200, {
+                    user : loggedInUser, genAccessToken, genRefreshToken // sending ref and aceess again so 
+                }, "User Logged in Successfully")                                                       // that user may have them by his own 
+            )
+})
+
+const logOutUser = asyncHandler( async (req, res) => {
+    
+})
+
+export {registerUser, loginUser}
