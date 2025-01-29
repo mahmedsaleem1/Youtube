@@ -35,11 +35,14 @@ const registerUser = asyncHandler ( async (req, res) => {
     if (existedUser) {
         throw new ApiError(409, "User Already Exists")
     }
+    
+    let avatarLocalPath;
 
-    const avatarLocalPath = req.files?.avatar[0].path
-    if (!avatarLocalPath) {
+    if (!req.files.avatar) {
         throw new ApiError(409, "Avatar is Required")
     }
+    
+    avatarLocalPath = req.files.avatar[0].path
 
     const avatarUrl = await uploadOnCloudinary(avatarLocalPath)
     if (!avatarUrl) {
