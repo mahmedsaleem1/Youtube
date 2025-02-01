@@ -240,16 +240,22 @@ const updateCoverImage = asyncHandler( async(req, res) => {
     if(!coverImageLocalPath) {
         throw new ApiError(404, "Cover Image is Missing")
     }
-
-    const coverImageUrl = await uploadOnCloudinary(coverImageLocalPath)
+    //
+     const coverImageUrl = await uploadOnCloudinary(coverImageLocalPath)
 
     if (!coverImageUrl.url) {
         throw new ApiError(400, "Cover Image cannot be updated now, Try again")
     }
 
-    const updatedUser = await User.findByIdAndUpdate(req.user?._id,{
+    const foundUser = await User.findById(req.user?._id).select("-password -refreshToken")
+
+    const urlToBeDeleted = foundUser.coverImage
+
+    await cloudinary.uploader.destroy(urlToBeDeleted)
+
+    const updatedUser = await User.updateOne(req.user?._id, {
         $set : {coverImage : coverImageUrl.url}
-    }, {new : true}).select("-password -refreshToken")
+    }, {new : true})
 
     return res
     .status(200)
