@@ -157,7 +157,7 @@ const refreshAccessToken = asyncHandler ( async (req, res) => {
             throw new ApiError(402, "Invalid Token")
         }
     
-        const bearerUser = User.findById(decodedToken._id)
+        const bearerUser = await User.findById(decodedToken._id)
     
         if (!bearerUser) {
             throw new ApiError(404, "User with the corresponding Refresh Token is not Found")
@@ -190,4 +190,75 @@ const refreshAccessToken = asyncHandler ( async (req, res) => {
     }
 })
 
-export {registerUser, loginUser, logOutUser, refreshAccessToken}
+const updateCurrentPassword = asyncHandler(async(req, res) => {
+    const {oldPassword, newPassword} = req.body
+
+    const user = await User.findById(req.user?._id)  // from the auth middle ware | logged In
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+
+    if (!isPasswordCorrect) {
+        throw new ApiError(400, "Invalid old password")
+    }
+
+    user.password = newPassword
+    await user.save({validateBeforeSave: false})
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully"))
+})
+
+const getCurrentUser = asyncHandler( async (req, res) => {
+    try {
+        return res
+        .status(200)
+        .json(new ApiResponse(
+            200, req?.user, "User Fetched Successfully"
+        ))
+    } catch (error) {
+        throw new ApiError(401, "User is unable to be fetched now")
+    }
+})
+
+const updateUserInfo = asyncHandler( async (req, res) => {
+    const {newFullname} = req.body
+
+    const userFound = User.findByIdAndUpdate(req?.user._id, {
+        $set : {
+            newFullname
+        }
+    }, {new : true}).select("-password -refreshToken")
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, userFound, "Account details updated successfully"))
+})
+
+const updateCoverImage = asyncHandler( async(req, res) => {
+    const coverImageLocalPath = req.file?.path
+
+    if(!coverImageLocalPath) {
+        throw new ApiError(404, "Cover Image is Missing")
+    }
+
+    const coverImageUrl = await uploadOnCloudinary(coverImageLocalPath)
+
+    if (!coverImageUrl.url) {
+        throw new ApiError(400, "Cover Image cannot be updated now, Try again")
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.user?._id,{
+        $set : {coverImage : coverImageUrl.url}
+    }, {new : true}).select("-password -refreshToken")
+
+    return res
+    .status(200)
+    .json(new ApiResponse(
+        200, updatedUser, "Cover Image successfully updated"
+    ))
+})
+
+export {registerUser, loginUser, logOutUser, refreshAccessToken,
+    updateCurrentPassword, getCurrentUser, updateUserInfo,
+    updateCoverImage
+}
